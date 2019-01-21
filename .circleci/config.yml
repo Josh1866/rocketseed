@@ -1,0 +1,49 @@
+version: 2
+jobs:
+  build:
+    branches:
+      only:
+        - master
+        - develop
+    environment:
+      TZ: "/usr/share/zoneinfo/South Africa/Cape_Town"
+    docker:
+      - image: circleci/build-image:ubuntu-14.04-XL-922-9410082
+      - image: circleci/mysql:5.7.22
+        environment:
+          MYSQL_ROOT_PASSWORD: Mysp@ce41
+          MYSQL_DATABASE: josh_home
+      - image: circleci/mongo:3-ram
+
+    steps:
+      - checkout
+      - run:
+          command: |
+            sudo mkdir -p /var/log/adsnative
+            sudo chmod -R 777 /var/log/adsnative
+            git submodule sync
+            git submodule update --init --recursive
+            find . -name "*.pyc" -exec rm -rf {} \;
+   
+      - run:
+          name: install global dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y python-virtualenv python-dev redis-server
+            sudo pip install -U pip
+            sudo pip install -U virtualenv
+      - run:
+          name: install django dependencies
+          command: |
+            virtualenv venv
+            . venv/bin/activate
+            pip install setuptools==20.3
+            pip install -r requirements.txt
+      - run:
+          name: run tests
+          environment:
+            CIRCLECI: true
+            TEST_MONGO_MODE: 1
+          command: |
+            . venv/bin/activate
+            python manage.py test -v 2 --with-nicedots --exclude-dir=common/mediation/management/commands/ --exclude-dir=common/tests/ --exclude-dir=common/feeplus/tests/
